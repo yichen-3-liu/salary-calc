@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>窝囊费计算器</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f5f6fa;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        .timer, .income {
+            margin: 20px 0;
+            font-size: 2.2rem;
+            color: #222f3e;
+            font-weight: bold;
+        }
+        .income {
+            font-size: 2.8rem;
+            color: #ff0800;
+        }
+        .label {
+            font-size: 1.2rem;
+            color: #576574;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <form id="settingForm" style="margin-bottom:30px;text-align:center;">
+            <label>月工资(元)：<input type="number" id="salaryInput" min="1" value="" style="width:100px;"></label>
+            <label style="margin-left:20px;">下班时间：<input type="time" id="offTimeInput" value="18:00" style="width:90px;"></label>
+        </form>
+        <div class="timer" id="timer">下班倒计时：--:--:--</div>
+        <div class="label" id="incomeLabel">今日窝囊费收入：</div>
+        <div class="income" id="income">￥0.00</div>
+        <div id="tip" style="margin-top:18px;font-size:1.1rem;color:#009966;text-align:center;"></div>
+    </div>
+    <script>
+        let salary = 0;
+        let offHour = 18, offMinute = 0;
+        let dailySalary = 0;
+        let workStartHour = 9, workStartMinute = 0;
+
+        function getWorkdays(year, month) {
+            let count = 0;
+            let date = new Date(year, month, 1);
+            while (date.getMonth() === month) {
+                let day = date.getDay();
+                if (day !== 0 && day !== 6) count++;
+                date.setDate(date.getDate() + 1);
+            }
+            return count;
+        }
+        function isWorkday(date) {
+            let day = date.getDay();
+            return day !== 0 && day !== 6;
+        }
+        function pad(n) { return n < 10 ? '0' + n : n; }
+
+        function getOffWorkTime(date) {
+            let off = new Date(date);
+            off.setHours(offHour, offMinute, 0, 0);
+            return off;
+        }
+        function getWorkStartTime(date) {
+            let start = new Date(date);
+            start.setHours(workStartHour, workStartMinute, 0, 0);
+            return start;
+        }
+
+        function update() {
+            const now = new Date();
+            const timerElem = document.getElementById('timer');
+            const incomeElem = document.getElementById('income');
+            const incomeLabel = document.getElementById('incomeLabel');
+            // 获取输入
+            salary = parseFloat(document.getElementById('salaryInput').value);
+            const offTime = document.getElementById('offTimeInput').value;
+            if (!/^\d{2}:\d{2}$/.test(offTime)) {
+                timerElem.textContent = '请填写下班时间';
+                incomeElem.textContent = '￥0.00';
+                return;
+            }
+            [offHour, offMinute] = offTime.split(':').map(Number);
+            if (isNaN(salary) || salary <= 0) {
+                timerElem.textContent = '请填写有效的月工资';
+                incomeElem.textContent = '￥0.00';
+                return;
+            }
+            // 计算本月工作日天数
+            const year = now.getFullYear();
+            const month = now.getMonth();
+            const workdays = getWorkdays(year, month);
+            dailySalary = salary / workdays;
+            if (!isWorkday(now)) {
+                timerElem.textContent = '今天不是工作日，窝囊费暂停计入';
+                incomeElem.textContent = '￥0.00';
+                return;
+            }
+            // 下班倒计时
+            const offWork = getOffWorkTime(now);
+            let diff = offWork - now;
+            if (diff < 0) diff = 0;
+            let h = Math.floor(diff / 3600000);
+            let m = Math.floor((diff % 3600000) / 60000);
+            let s = Math.floor((diff % 60000) / 1000);
+            timerElem.textContent = `下班倒计时：${pad(h)}:${pad(m)}:${pad(s)}`;
+
+            // 计算今日已获得窝囊费
+            let workStart = getWorkStartTime(now);
+            let workEnd = getOffWorkTime(now);
+            let totalWorkMs = workEnd - workStart;
+            let earned = 0;
+            if (now < workStart) {
+                earned = 0;
+            } else if (now > workEnd) {
+                earned = dailySalary;
+            } else {
+                earned = dailySalary * ((now - workStart) / totalWorkMs);
+            }
+            incomeElem.textContent = '￥' + earned.toFixed(2);
+        }
+
+        document.getElementById('salaryInput').addEventListener('input', update);
+        document.getElementById('offTimeInput').addEventListener('input', update);
+        setInterval(update, 1000);
+        update();
+
+        // 励志语录
+        const tips = [
+            '记得喝水！',
+            '活动一下吧~',
+            '小心腰哦！',
+            '摸鱼提醒！',
+            '宝宝棒棒，继续加油！'
+        ];
+        function showTip() {
+            const tipElem = document.getElementById('tip');
+            const idx = Math.floor(Math.random() * tips.length);
+            tipElem.textContent = tips[idx];
+        }
+        showTip();
+        setInterval(showTip, 600000); // 10分钟刷新一次
+    </script>
+</body>
+</html>
