@@ -37,9 +37,11 @@
     <div class="container">
         <form id="settingForm" style="margin-bottom:30px;text-align:center;">
             <label>月工资(元)：<input type="number" id="salaryInput" min="1" value="" style="width:100px;"></label>
+            <button type="button" id="toggleVisibility" style="margin-left:8px;padding:2px 8px;cursor:pointer;font-size:0.9rem;">👁️</button>
             <label style="margin-left:20px;">下班时间：<input type="time" id="offTimeInput" value="18:00" style="width:90px;"></label>
         </form>
         <div class="timer" id="timer">下班倒计时：--:--:--</div>
+        <div class="timer" id="overtime" style="display:none;color:#ff6b6b;">加班时长：00:00:00</div>
         <div class="label" id="incomeLabel">今日窝囊费收入：</div>
         <div class="income" id="income">￥0.00</div>
         <div id="tip" style="margin-top:18px;font-size:1.1rem;color:#009966;text-align:center;"></div>
@@ -48,7 +50,51 @@
         let salary = 0;
         let offHour = 18, offMinute = 0;
         let dailySalary = 0;
-        let workStartHour = 9, workStartMinute = 0;
+        let workStartHour = 9, workStartMinute = 30;
+
+        // 从localStorage加载保存的设置
+        function loadSettings() {
+            const savedSalary = localStorage.getItem('salary');
+            const savedOffTime = localStorage.getItem('offTime');
+            const savedVisibility = localStorage.getItem('salaryVisible');
+            if (savedSalary) {
+                document.getElementById('salaryInput').value = savedSalary;
+            }
+            if (savedOffTime) {
+                document.getElementById('offTimeInput').value = savedOffTime;
+            }
+            // 恢复可见性状态，默认显示
+            if (savedVisibility === 'false') {
+                toggleSalaryVisibility();
+            }
+        }
+
+        // 保存设置到localStorage
+        function saveSettings() {
+            const salaryValue = document.getElementById('salaryInput').value;
+            const offTimeValue = document.getElementById('offTimeInput').value;
+            if (salaryValue) {
+                localStorage.setItem('salary', salaryValue);
+            }
+            if (offTimeValue) {
+                localStorage.setItem('offTime', offTimeValue);
+            }
+        }
+
+        // 切换工资显示/隐藏
+        function toggleSalaryVisibility() {
+            const salaryInput = document.getElementById('salaryInput');
+            const toggleBtn = document.getElementById('toggleVisibility');
+            if (salaryInput.type === 'number') {
+                salaryInput.type = 'password';
+                toggleBtn.textContent = '🙈';
+                localStorage.setItem('salaryVisible', 'false');
+            } else {
+                salaryInput.type = 'number';
+                toggleBtn.textContent = '👁️';
+                localStorage.setItem('salaryVisible', 'true');
+            }
+        }
 
         function getWorkdays(year, month) {
             let count = 0;
@@ -108,12 +154,36 @@
             }
             // 下班倒计时
             const offWork = getOffWorkTime(now);
+            const overtimeElem = document.getElementById('overtime');
             let diff = offWork - now;
-            if (diff < 0) diff = 0;
-            let h = Math.floor(diff / 3600000);
-            let m = Math.floor((diff % 3600000) / 60000);
-            let s = Math.floor((diff % 60000) / 1000);
-            timerElem.textContent = `下班倒计时：${pad(h)}:${pad(m)}:${pad(s)}`;
+            if (diff < 0) {
+                // 加班中
+                timerElem.style.display = 'none';
+                overtimeElem.style.display = 'block';
+                let overtimeDiff = now - offWork;
+                let oh = Math.floor(overtimeDiff / 3600000);
+                let om = Math.floor((overtimeDiff % 3600000) / 60000);
+                let os = Math.floor((overtimeDiff % 60000) / 1000);
+                overtimeElem.textContent = `加班时长：${pad(oh)}:${pad(om)}:${pad(os)}`;
+                // 计算加班分钟数，每15分钟多一个感叹号
+                let overtimeMinutes = Math.floor(overtimeDiff / 60000);
+                let exclamations = Math.floor(overtimeMinutes / 15) + 1;
+                document.getElementById('tip').textContent = '怎么还在加班，批评' + '！'.repeat(exclamations);
+                document.getElementById('tip').style.color = '#ff6b6b';
+            } else {
+                timerElem.style.display = 'block';
+                overtimeElem.style.display = 'none';
+                diff = Math.max(0, diff);
+                let h = Math.floor(diff / 3600000);
+                let m = Math.floor((diff % 3600000) / 60000);
+                let s = Math.floor((diff % 60000) / 1000);
+                timerElem.textContent = `下班倒计时：${pad(h)}:${pad(m)}:${pad(s)}`;
+                // 恢复正常提示语
+                if (document.getElementById('tip').style.color === 'rgb(255, 107, 107)') {
+                    showTip();
+                    document.getElementById('tip').style.color = '#009966';
+                }
+            }
 
             // 计算今日已获得窝囊费
             let workStart = getWorkStartTime(now);
@@ -130,8 +200,16 @@
             incomeElem.textContent = '￥' + earned.toFixed(2);
         }
 
-        document.getElementById('salaryInput').addEventListener('input', update);
-        document.getElementById('offTimeInput').addEventListener('input', update);
+        document.getElementById('salaryInput').addEventListener('input', () => {
+            saveSettings();
+            update();
+        });
+        document.getElementById('offTimeInput').addEventListener('input', () => {
+            saveSettings();
+            update();
+        });
+        document.getElementById('toggleVisibility').addEventListener('click', toggleSalaryVisibility);
+        loadSettings();
         setInterval(update, 1000);
         update();
 
@@ -141,6 +219,7 @@
             '活动一下吧~',
             '小心腰哦！',
             '摸鱼提醒！',
+            '上班辛苦啦！',
             '宝宝棒棒，继续加油！'
         ];
         function showTip() {
